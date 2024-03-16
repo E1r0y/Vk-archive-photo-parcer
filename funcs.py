@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import os
 import re
 
@@ -27,7 +28,10 @@ def rename_files(input_folder='./input', extension=".html"):
                 if os.path.isfile(old_path):
                     new_filename = str(i) + extension
                     new_path = os.path.join(folder_path, new_filename)
-                    os.rename(old_path, new_path)
+                    try:
+                        os.rename(old_path, new_path)
+                    except FileExistsError:
+                        pass
     return folder_name
 
 
@@ -56,7 +60,7 @@ async def download_images_from_file_async(session, file_path, output_folder):
         tasks = []
         for cnt, line in enumerate(lines, start=1):
             url = line.strip()
-            tasks.append(download_image(session, url, output_folder, cnt, total_images, progress_bar))
+            tasks.append(download_image(session, url, output_folder, cnt, progress_bar))
 
         await asyncio.gather(*tasks)
 
@@ -71,17 +75,20 @@ async def downloader_async(path='./photo', links='links.txt'):
 def grabber(folder_name):
     path = f"./input/{folder_name}"
     count = len([f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))])
-    _ = 0
+
     try:
         with open('links.txt', 'w') as y:
-            for _ in range(count):
-                _ += 1
-                with open(f'{path}\{_}.html', 'r') as x:
-                    soup = BeautifulSoup(x, 'html.parser')
-                    links = soup.select('a[href^="https://sun"]')
-                    for link in links:
-                        x = link.get('href')
-                        y.write(f'{x}\n')
+            soup = BeautifulSoup("", 'lxml')
+            for idx in range(1, count + 1):
+                file_path = f'{path}/{idx}.html'
+                if os.path.exists(file_path):
+                    with open(file_path, 'r') as x:
+                        soup.clear()
+                        soup = BeautifulSoup(x, 'lxml')
+                        links = soup.select('a[href^="https://sun"]')
+                        for link in links:
+                            href = link.get('href')
+                            y.write(f'{href}\n')
         summary = sum(1 for _ in open('links.txt', 'r'))
         return summary
     except FileNotFoundError:
